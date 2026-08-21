@@ -1,0 +1,13 @@
+services:
+  robot-project:
+    build: .
+    container_name: robot-project
+    ports:
+      - "8080:8080"
+    volumes:
+      # bot store survives container recreation/rebuilds
+      - ./data:/app/data
+      # edit client.lua on the host and turtles pick up the change
+      # on their next wget — no image rebuild needed
+      - ./client:/app/client
+    restart: unless-stopped
