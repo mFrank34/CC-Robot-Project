@@ -9,7 +9,7 @@ import (
 )
 
 func (h *Handler) CreateId(c *gin.Context) {
-	id, err := util.GenerateCode(8)
+	id, err := util.GenerateCode(4)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate code"})
 		return
