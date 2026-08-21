@@ -6,39 +6,65 @@
 -- CONFIG
 ----------------------------------------------------------------------
 
-local BASE_URL     = "http://localhost:8080"  -- <-- set to your server's LAN IP
-local ID_FILE      = ".bot_id"                    -- persisted on the turtle's own disk
-local POLL_INTERVAL = 1                           -- seconds between loop iterations
-local LOW_FUEL_WARN = 50                          -- log a warning below this fuel level
+local BASE_URL      = "http://localhost:8080"  -- <-- set to your server's LAN IP
+local ID_FILE       = ".bot_id"                -- persisted on the turtle's own disk
+local POLL_INTERVAL = 1                        -- seconds between loop iterations
+local LOW_FUEL_WARN = 50                       -- log a warning below this fuel level
 
 ----------------------------------------------------------------------
 -- HTTP HELPERS
--- CC:Tweaked's http.get / http.post are blocking convenience wrappers
--- (as opposed to the async http.request + "http_success" event API),
+-- CC:Tweaked's http.get / http.post are blocking convenience wrappers,
 -- which suits a simple poll loop like this one.
 ----------------------------------------------------------------------
 
+-- CC:Tweaked's http.get/http.post return nil on any non-2xx response, with
+-- `err` set to just the reason phrase ("Bad Request", "Not Found", etc).
+-- They also return a THIRD value on failure: the failed response handle,
+-- which still has a readable status code and body. We read that here so
+-- we can see the server's actual JSON error message instead of guessing.
+local function readFailedResponse(failRes)
+    if not failRes then return nil, nil end
+    local code = failRes.getResponseCode()
+    local body = failRes.readAll()
+    failRes.close()
+    return code, body
+end
+
 local function httpGet(path)
-    local res, err = http.get(BASE_URL .. path)
+    local res, err, failRes = http.get(BASE_URL .. path)
     if not res then
-        print("[http] GET " .. path .. " failed: " .. tostring(err))
-        return nil
+        local code, body = readFailedResponse(failRes)
+        print("[http] GET " .. path .. " failed: " .. tostring(err) ..
+              (code and (" (HTTP " .. code .. ")") or "") ..
+              (body and body ~= "" and (" body: " .. body) or ""))
+        return nil, code
     end
     local body = res.readAll()
     res.close()
-    return textutils.unserializeJSON(body)
+    return textutils.unserializeJSON(body), res.getResponseCode()
 end
 
-local function httpPost(path, bodyTable)
-    local payload = bodyTable and textutils.serializeJSON(bodyTable) or nil
-    local res, err = http.post(
-        BASE_URL .. path,
-        payload,
-        { ["Content-Type"] = "application/json" }
-    )
+-- `bodyTable` can be a Lua table (auto-serialized) or, when rawJson is true,
+-- an already-built JSON string. The raw-string path exists because
+-- textutils.serializeJSON can't reliably tell an empty array apart from an
+-- empty object, so payloads with array fields that might be empty (like
+-- our inventory list) are built manually instead. See reportStatus().
+local function httpPost(path, bodyTable, rawJson)
+    local payload
+    if rawJson then
+        payload = bodyTable or ""
+    else
+        payload = bodyTable and textutils.serializeJSON(bodyTable) or ""
+    end
+    local headers = (bodyTable and payload ~= "") and { ["Content-Type"] = "application/json" } or nil
+
+    local res, err, failRes = http.post(BASE_URL .. path, payload, headers)
     if not res then
-        print("[http] POST " .. path .. " failed: " .. tostring(err))
-        return nil, nil
+        local code, body = readFailedResponse(failRes)
+        print("[http] POST " .. path .. " failed: " .. tostring(err) ..
+              (code and (" (HTTP " .. code .. ")") or "") ..
+              (body and body ~= "" and (" body: " .. body) or ""))
+        return code, nil
     end
     local code = res.getResponseCode()
     local body = res.readAll()
@@ -103,6 +129,15 @@ end
 -- STATUS REPORTING
 ----------------------------------------------------------------------
 
+-- textutils.serializeJSON can't distinguish an empty Lua table from an
+-- empty JSON object, so an empty inventory always serializes as `{}` no
+-- matter what metatable hints are set. The server wants a JSON array
+-- ([]bot.InventoryItem in Go), so `{}` triggers:
+--   "json: cannot unmarshal object into Go struct field Status.inventory
+--    of type []bot.InventoryItem"
+-- Workaround: build the inventory portion of the JSON as a raw string,
+-- letting serializeJSON handle just the individual item objects (which
+-- are never ambiguous since they always have named keys).
 local function collectInventory()
     local inventory = {}
     for slot = 1, 16 do
@@ -110,7 +145,7 @@ local function collectInventory()
         if detail then
             table.insert(inventory, {
                 slot  = slot,
-                name  = detail.name,
+                item  = detail.name,  -- server's bot.InventoryItem expects "item", not "name"
                 count = detail.count,
             })
         end
@@ -118,30 +153,46 @@ local function collectInventory()
     return inventory
 end
 
+local function inventoryToJsonArray(inventory)
+    if #inventory == 0 then
+        return "[]"
+    end
+    local parts = {}
+    for _, item in ipairs(inventory) do
+        table.insert(parts, textutils.serializeJSON(item))
+    end
+    return "[" .. table.concat(parts, ",") .. "]"
+end
+
 local function reportStatus(botId)
     local fuel = turtle.getFuelLevel()
     local fuelLimit = turtle.getFuelLimit()
 
-    -- unlimited fuel worlds return the string "unlimited" instead of a number
-    if fuel == "unlimited" then fuel = -1 end
-    if fuelLimit == "unlimited" then fuelLimit = -1 end
+    -- Map "unlimited" fuel to 0 to prevent 400 validation errors on backend integers
+    if fuel == "unlimited" then fuel = 0 end
+    if fuelLimit == "unlimited" then fuelLimit = 0 end
 
-    if type(fuel) == "number" and fuel < LOW_FUEL_WARN and fuel >= 0 then
+    if type(fuel) == "number" and fuel < LOW_FUEL_WARN and fuel > 0 then
         print("[status] WARNING: low fuel (" .. fuel .. ")")
     end
 
-    httpPost("/id/" .. botId .. "/status", {
-        fuel       = fuel,
-        fuel_limit = fuelLimit,
-        inventory  = collectInventory(),
-    })
+    local inventoryJson = inventoryToJsonArray(collectInventory())
+    local payload = string.format(
+        '{"fuel":%d,"fuel_limit":%d,"inventory":%s}',
+        fuel, fuelLimit, inventoryJson
+    )
+
+    local code = httpPost("/id/" .. botId .. "/status", payload, true)
+
+    -- Surface non-2xx responses instead of failing silently.
+    if code and (code < 200 or code >= 300) then
+        print("[status] WARNING: server returned " .. tostring(code))
+    end
 end
 
 ----------------------------------------------------------------------
 -- COMMAND DISPATCH TABLE
 -- Maps a "payload" string (sent by the controller) to a turtle action.
--- Every entry returns (ok, errMsg) matching the turtle API's own
--- return signature where applicable, so results can be logged uniformly.
 ----------------------------------------------------------------------
 
 local commands = {
@@ -183,21 +234,21 @@ local commands = {
     compareUp   = function() return turtle.compareUp() end,
     compareDown = function() return turtle.compareDown() end,
 
-    -- sucking items from inventories/ground
-    suck     = function(arg) return turtle.suck(arg) end,
-    suckUp   = function(arg) return turtle.suckUp(arg) end,
-    suckDown = function(arg) return turtle.suckDown(arg) end,
+    -- sucking items from inventories/ground (with safe number conversion)
+    suck     = function(arg) return turtle.suck(tonumber(arg)) end,
+    suckUp   = function(arg) return turtle.suckUp(tonumber(arg)) end,
+    suckDown = function(arg) return turtle.suckDown(tonumber(arg)) end,
 
     -- dropping items
-    drop     = function(arg) return turtle.drop(arg) end,
-    dropUp   = function(arg) return turtle.dropUp(arg) end,
-    dropDown = function(arg) return turtle.dropDown(arg) end,
+    drop     = function(arg) return turtle.drop(tonumber(arg)) end,
+    dropUp   = function(arg) return turtle.dropUp(tonumber(arg)) end,
+    dropDown = function(arg) return turtle.dropDown(tonumber(arg)) end,
 
     -- refueling
-    refuel = function(arg) return turtle.refuel(arg) end,
+    refuel = function(arg) return turtle.refuel(tonumber(arg)) end,
 
     -- crafting (crafty turtles only)
-    craft = function(arg) return turtle.craft(arg) end,
+    craft = function(arg) return turtle.craft(tonumber(arg)) end,
 
     -- equipping tools/peripherals in each hand
     equipLeft  = function() return turtle.equipLeft() end,
