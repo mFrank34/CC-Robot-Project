@@ -1,17 +1,31 @@
 package main
 
 import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"Robot-Project/internal/bot"
 	"Robot-Project/internal/endpoint"
 
 	"github.com/gin-gonic/gin"
 )
 
+const dataFile = "data/store.json"
+
 func main() {
+	botStore, err := bot.Load(dataFile)
+	if err != nil {
+		log.Fatalf("failed to load store: %v", err)
+	}
+
 	router := gin.Default()
 
 	// dependencies
-	botStore := bot.NewStore()
 	botHandler := endpoint.NewHandler(botStore)
 
 	// routes
@@ -29,5 +43,34 @@ func main() {
 	router.POST("/id/:id/status", botHandler.SetStatus)
 	router.GET("/id/:id/status", botHandler.GetStatus)
 
-	router.Run(":8080")
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+
+	// run the server in a goroutine so main() is free to wait for a signal
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	// block until Ctrl+C or a kill signal arrives
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down, saving store...")
+	if err := botStore.Save(dataFile); err != nil {
+		log.Printf("failed to save store on exit: %v", err)
+	}
+
+	// give in-flight requests up to 5s to finish before the process exits
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
+
+	log.Println("done")
 }
