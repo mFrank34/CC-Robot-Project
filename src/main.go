@@ -18,6 +18,10 @@ import (
 const dataFile = "data/store.json"
 
 func main() {
+	if err := os.MkdirAll("data", 0755); err != nil {
+		log.Fatalf("failed to create data dir: %v", err)
+	}
+
 	botStore, err := bot.Load(dataFile)
 	if err != nil {
 		log.Fatalf("failed to load store: %v", err)

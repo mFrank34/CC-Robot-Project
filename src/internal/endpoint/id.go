@@ -18,17 +18,18 @@ func (h *Handler) CreateId(c *gin.Context) {
 }
 
 func (h *Handler) Register(c *gin.Context) {
-	var req bot.RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	id := c.Param("id")
+
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Bot ID is required"})
 		return
 	}
 
-	if h.store.Exists(req.Id) {
+	if h.store.Exists(id) {
 		c.JSON(http.StatusConflict, gin.H{"error": "Bot with this ID already exists"})
 		return
 	}
 
-	h.store.Add(bot.Bot{Id: req.Id})
+	h.store.Add(bot.Bot{Id: id})
 	c.JSON(http.StatusCreated, gin.H{"message": "Bot registered successfully"})
 }
