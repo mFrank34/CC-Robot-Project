@@ -35,6 +35,9 @@ func main() {
 	// routes
 	router.GET("/health", endpoint.Check)
 
+	// serve the client.lua file for the bot
+	router.GET("/client.lua", endpoint.serveClient)
+
 	// bot routes for creating IDs and registering bots
 	router.GET("/id", botHandler.CreateId)
 	router.POST("/id/:id", botHandler.Register)
