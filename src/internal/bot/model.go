@@ -20,3 +20,15 @@ type SendRequest struct {
 	From    string `json:"from"`
 	Payload string `json:"payload"`
 }
+
+type InventoryItem struct {
+	Slot  int    `json:"slot"`
+	Item  string `json:"item"`
+	Count int    `json:"count"`
+}
+
+type Status struct {
+	Fuel      int             `json:"fuel"`
+	Inventory []InventoryItem `json:"inventory"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}

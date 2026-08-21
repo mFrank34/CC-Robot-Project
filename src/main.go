@@ -2,7 +2,7 @@ package main
 
 import (
 	"Robot-Project/internal/bot"
-	"Robot-Project/internal/health"
+	"Robot-Project/internal/endpoint"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,10 +12,10 @@ func main() {
 
 	// dependencies
 	botStore := bot.NewStore()
-	botHandler := bot.NewHandler(botStore)
+	botHandler := endpoint.NewHandler(botStore)
 
 	// routes
-	router.GET("/health", health.Check)
+	router.GET("/health", endpoint.Check)
 
 	// bot routes for creating IDs and registering bots
 	router.GET("/id", botHandler.CreateId)
@@ -23,7 +23,11 @@ func main() {
 
 	// message routes for sending and retrieving messages
 	router.POST("/id/:id/message", botHandler.SendMessage)
-	router.GET("/id/:id/message", botHandler.GetLatestMessage)
+	router.GET("/id/:id/message", botHandler.GetMessage)
+
+	// creating status routes for setting and getting bot status
+	router.POST("/id/:id/status", botHandler.SetStatus)
+	router.GET("/id/:id/status", botHandler.GetStatus)
 
 	router.Run(":8080")
 }
