@@ -33,3 +33,8 @@ func (h *Handler) Register(c *gin.Context) {
 	h.store.Add(bot.Bot{Id: id})
 	c.JSON(http.StatusCreated, gin.H{"message": "Bot registered successfully"})
 }
+
+func (h *Handler) AllIDs(c *gin.Context) {
+	ids := h.store.GetAllIDs()
+	c.JSON(http.StatusOK, gin.H{"ids": ids})
+}

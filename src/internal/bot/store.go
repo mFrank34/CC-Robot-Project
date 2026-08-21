@@ -1,6 +1,9 @@
 package bot
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
 type Store struct {
 	mu     sync.RWMutex
@@ -30,6 +33,17 @@ func (s *Store) Add(b Bot) {
 	s.bots[b.Id] = b
 }
 
+func (s *Store) GetAllIDs() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	ids := make([]string, 0, len(s.bots))
+	for id := range s.bots {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
 func (s *Store) SetLatest(targetId string, msg Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

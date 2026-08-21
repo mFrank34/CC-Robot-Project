@@ -40,10 +40,10 @@ func main() {
 
 	// bot routes for creating IDs and registering bots
 	router.GET("/id", botHandler.CreateId)
+	router.GET("/ids", botHandler.AllIDs)
 	router.POST("/id/:id", botHandler.Register)
 
 	// message routes for sending and retrieving messages
-
 	router.POST("/id/:id/message", botHandler.SendMessage)
 	router.GET("/id/:id/message", botHandler.GetMessage)
 
