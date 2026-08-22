@@ -41,7 +41,10 @@ func (h *Handler) GetMessage(c *gin.Context) {
 
 	msg, ok := h.store.GetLatest(id)
 	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": nil})
+		c.JSON(http.StatusOK, gin.H{"message": bot.Message{
+			Payload: "stop",
+			SentAt:  time.Now(),
+		}})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": msg})
