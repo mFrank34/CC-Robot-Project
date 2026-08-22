@@ -1,3 +1,9 @@
+version: "3.9"
+
+networks:
+  frankslab-uk:
+    external: true
+
 services:
   robot-project:
     build:
@@ -7,3 +13,5 @@ services:
     ports:
       - "7001:8080"
     restart: unless-stopped
+    networks:
+      - frankslab-uk
