@@ -5,5 +5,5 @@ services:
       dockerfile: Dockerfile
     container_name: robot-project
     ports:
-      - "8080:8080"
+      - "70018080"
     restart: unless-stopped
