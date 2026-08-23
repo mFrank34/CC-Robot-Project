@@ -21,10 +21,10 @@ type Message struct {
 	SentAt  time.Time `json:"timestamp"`
 }
 
-type SendRequest struct {
-	From    string `json:"from"`
-	Payload string `json:"payload"`
-	Args    string `json:"args"`
+type MessageRequest struct {
+	From    string  `json:"from"`
+	Payload Command `json:"payload"`
+	Args    string  `json:"args"`
 }
 
 type InventoryItem struct {

@@ -3,7 +3,6 @@ package send
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"Robot-Project/external/router"
 	"Robot-Project/internal/model"
@@ -11,11 +10,10 @@ import (
 
 // SendMessage builds a command message and posts it to the given bot ID.
 func Message(host, id string, cmd model.Command, arg string, from string) ([]byte, int, error) {
-	msg := model.Message{
+	msg := model.MessageRequest{
 		From:    from,
 		Payload: cmd,
-		Arg:     arg,
-		SentAt:  time.Now(),
+		Args:    arg,
 	}
 
 	pack, err := json.Marshal(msg)

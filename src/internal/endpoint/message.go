@@ -16,7 +16,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	var req model.SendRequest
+	var req model.MessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
