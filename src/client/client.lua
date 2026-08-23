@@ -157,6 +157,16 @@ local function reregister()
 end
 
 ----------------------------------------------------------------------
+-- LAST-COMMAND TRACKING
+-- Populated by executeCommand() each loop, then sent up in the next
+-- reportStatus() call so the server can validate whether the command it
+-- last sent actually ran (see Handler.SetStatus on the server side).
+----------------------------------------------------------------------
+
+local lastCommand = ""       -- payload string of the last command we attempted
+local lastState   = "done"   -- "done" or "failed"; "done" until a command runs
+
+----------------------------------------------------------------------
 -- STATUS REPORTING
 ----------------------------------------------------------------------
 
@@ -199,11 +209,9 @@ end
 -- return value of true) so the caller can decide whether to re-register.
 local function reportStatus(botId)
     local fuel = turtle.getFuelLevel()
-    local fuelLimit = turtle.getFuelLimit()
 
     -- Map "unlimited" fuel to 0 to prevent 400 validation errors on backend integers
     if fuel == "unlimited" then fuel = 0 end
-    if fuelLimit == "unlimited" then fuelLimit = 0 end
 
     if type(fuel) == "number" and fuel < LOW_FUEL_WARN and fuel > 0 then
         print("[status] WARNING: low fuel (" .. fuel .. ")")
@@ -211,15 +219,22 @@ local function reportStatus(botId)
 
     local inventoryJson = inventoryToJsonArray(collectInventory())
     local payload = string.format(
-        '{"fuel":%d,"fuel_limit":%d,"inventory":%s}',
-        fuel, fuelLimit, inventoryJson
+        '{"fuel":%d,"inventory":%s,"state":"%s","last_command":"%s"}',
+        fuel, inventoryJson, lastState, lastCommand
     )
 
-    local code, _, rawBody = httpPost("/id/" .. botId .. "/status", payload, true)
+    local code, decoded, rawBody = httpPost("/id/" .. botId .. "/status", payload, true)
 
     -- Surface non-2xx responses instead of failing silently.
     if code and (code < 200 or code >= 300) then
         print("[status] WARNING: server returned " .. tostring(code))
+    end
+
+    -- Server echoes back {"result": "ok"|"failed"} once the SetStatus
+    -- correlation check runs; log it so a "failed" (command mismatch,
+    -- or the bot self-reported a failure) is visible on the turtle side.
+    if decoded and decoded.result then
+        print("[status] server result: " .. tostring(decoded.result))
     end
 
     return code, isBotNotFound(code, rawBody)
@@ -321,11 +336,15 @@ local function executeCommand(msg)
     local action = commands[msg.payload]
     if not action then
         print("[cmd] Unknown command: " .. tostring(msg.payload))
+        lastCommand = tostring(msg.payload)
+        lastState = "failed"
         return
     end
 
     print("[cmd] Executing: " .. msg.payload)
     local ok, errOrResult = action(msg.arg)
+    lastCommand = msg.payload
+    lastState = ok and "done" or "failed"
     if ok then
         print("[cmd] OK")
     else

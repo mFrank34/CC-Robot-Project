@@ -28,7 +28,9 @@ type InventoryItem struct {
 }
 
 type Status struct {
-	Fuel      int             `json:"fuel"`
-	Inventory []InventoryItem `json:"inventory"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	Fuel        int             `json:"fuel"`
+	Inventory   []InventoryItem `json:"inventory"`
+	State       string          `json:"state"`
+	LastCommand Command         `json:"last_command"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
