@@ -7,7 +7,7 @@ COPY src/go.mod src/go.sum ./
 RUN go mod download
 
 COPY src/ .
-RUN CGO_ENABLED=0 GOOS=linux go build -o main main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api
 
 # ---- Runtime stage ----
 FROM alpine:3.20
