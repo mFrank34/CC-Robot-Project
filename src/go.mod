@@ -1,4 +1,4 @@
-module cc-robot-project
+module Robot-Project
 
 go 1.26.6
 

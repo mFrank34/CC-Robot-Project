@@ -1,7 +1,7 @@
 package endpoint
 
 import (
-	"Robot-Project/internal/bot"
+	"Robot-Project/internal/model"
 	"net/http"
 	"time"
 
@@ -16,7 +16,7 @@ func (h *Handler) SetStatus(c *gin.Context) {
 		return
 	}
 
-	var st bot.Status
+	var st model.Status
 	if err := c.ShouldBindJSON(&st); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

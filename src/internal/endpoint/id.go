@@ -1,7 +1,7 @@
 package endpoint
 
 import (
-	bot "Robot-Project/internal/model"
+	"Robot-Project/internal/model"
 	"Robot-Project/internal/util"
 	"net/http"
 
@@ -30,7 +30,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	h.store.Add(bot.Bot{Id: id})
+	h.store.Add(model.Bot{Id: id})
 	c.JSON(http.StatusCreated, gin.H{"message": "Bot registered successfully"})
 }
 
@@ -38,6 +38,6 @@ func (h *Handler) AllIDs(c *gin.Context) {
 	rawids := h.store.GetAllIDs()
 
 	c.JSON(http.StatusOK, gin.H{
-		"ids": rawids, // Passes {"ids": [...]} directly
+		"ids": rawids,
 	})
 }
