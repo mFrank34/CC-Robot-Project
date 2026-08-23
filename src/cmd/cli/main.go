@@ -1,50 +1,25 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
+
+	"Robot-Project/external/router"
+	"Robot-Project/external/send"
+	"Robot-Project/internal/model"
 )
-
-type Ids struct {
-	Ids []string `json:"ids"`
-}
-
-type Message struct {
-	From    string    `json:"from"`
-	Payload string    `json:"payload"`
-	SentAt  time.Time `json:"timestamp"`
-}
-
-func request(host string, subroute string) ([]byte, error) {
-	resp, err := http.Get(host + subroute)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
-}
 
 func main() {
 	host := "https://cc.frankslab.uk"
 
 	// 1. Fetch the IDs
-	body, err := request(host, "/ids")
+	body, err := router.Get(host, "/ids")
 	if err != nil {
 		fmt.Println("Error making request:", err)
 		return
 	}
 
-	var result Ids
+	var result model.Ids
 	if err := json.Unmarshal(body, &result); err != nil {
 		fmt.Println("Error unmarshaling JSON:", err)
 		return
@@ -60,46 +35,24 @@ func main() {
 		fmt.Printf("ID [%d]: %s\n", i, id)
 	}
 
-	// 2. Prepare the POST message payload
-	command := Message{
-		From:    "Michael",
-		Payload: "forward",
-		SentAt:  time.Now(),
-	}
+	targetId := result.Ids[0]
 
-	pack, err := json.Marshal(command)
+	// 2. Send the message
+	msgResp, statusCode, err := send.Message(host, targetId, model.Forward, "", "Michael")
 	if err != nil {
-		fmt.Println("Error parsing struct to JSON:", err)
+		fmt.Println("Error sending message:", err)
 		return
 	}
 
-	// 3. Construct the clean URL using fmt.Sprintf
-	url := fmt.Sprintf("%s/id/%s/message", host, result.Ids[2])
+	fmt.Printf("\n[message] Status: %d\n", statusCode)
+	fmt.Printf("[message] Response: %s\n", string(msgResp))
 
-	// 4. Send the POST request
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(pack))
+	// 3. Fetch the bot's status
+	statusResp, err := router.Get(host, "/id/"+targetId+"/status")
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		fmt.Println("Error fetching status:", err)
 		return
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error sending request:", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	// 5. Read the POST response
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response:", err)
-		return
-	}
-
-	fmt.Printf("\nStatus: %d\n", resp.StatusCode)
-	fmt.Printf("Response: %s\n", string(responseBody))
+	fmt.Printf("\n[status] Response: %s\n", string(statusResp))
 }
