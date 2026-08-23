@@ -11,7 +11,7 @@ type RegisterRequest struct {
 }
 
 type Ids struct {
-	Id []string `json:"ids"`
+	Ids []string `json:"ids"`
 }
 
 type Message struct {
