@@ -25,6 +25,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	h.store.SetLatest(targetId, model.Message{
 		From:    req.From,
 		Payload: model.Command(req.Payload),
+		Arg:     req.Args,
 		SentAt:  time.Now(),
 	})
 

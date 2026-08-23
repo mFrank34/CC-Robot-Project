@@ -24,6 +24,7 @@ type Message struct {
 type SendRequest struct {
 	From    string `json:"from"`
 	Payload string `json:"payload"`
+	Args    string `json:"args"`
 }
 
 type InventoryItem struct {
