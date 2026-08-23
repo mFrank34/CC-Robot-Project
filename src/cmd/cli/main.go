@@ -1,58 +1,75 @@
 package main
 
 import (
-	"encoding/json"
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
 
-	"Robot-Project/external/router"
+	"Robot-Project/external/retrieve"
 	"Robot-Project/external/send"
 	"Robot-Project/internal/model"
 )
 
+const host = "https://cc.frankslab.uk"
+const from = "Michael"
+
 func main() {
-	host := "https://cc.frankslab.uk"
+	reader := bufio.NewReader(os.Stdin)
 
-	// 1. Fetch the IDs
-	body, err := router.Get(host, "/ids")
-	if err != nil {
-		fmt.Println("Error making request:", err)
-		return
+	for {
+		// 1. List bots
+		ids, err := retrieve.Ids(host)
+		if err != nil {
+			fmt.Println("Error fetching bot ids:", err)
+			continue
+		}
+		if len(ids) == 0 {
+			fmt.Println("No bots found. Retrying...")
+			continue
+		}
+
+		fmt.Println("\nAvailable bots:")
+		for i, id := range ids {
+			fmt.Printf("  [%d] %s\n", i, id)
+		}
+
+		// 2. Select a bot
+		fmt.Print("Select bot (index): ")
+		selection, _ := reader.ReadString('\n')
+		selection = strings.TrimSpace(selection)
+
+		var idx int
+		if _, err := fmt.Sscanf(selection, "%d", &idx); err != nil || idx < 0 || idx >= len(ids) {
+			fmt.Println("Invalid selection, try again.")
+			continue
+		}
+		targetId := ids[idx]
+
+		// 3. Issue a command
+		fmt.Print("Enter command (e.g. forward, dig, drop): ")
+		cmdInput, _ := reader.ReadString('\n')
+		cmdInput = strings.TrimSpace(cmdInput)
+
+		fmt.Print("Enter arg (leave blank if none): ")
+		argInput, _ := reader.ReadString('\n')
+		argInput = strings.TrimSpace(argInput)
+
+		cmd := model.Command(cmdInput)
+
+		respBody, statusCode, err := send.Message(host, targetId, cmd, argInput, from)
+		if err != nil {
+			fmt.Println("Error sending command:", err)
+			continue
+		}
+		fmt.Printf("[message] Status: %d, Response: %s\n", statusCode, respBody)
+
+		// 4. Check status
+		status, err := retrieve.Status(host, targetId)
+		if err != nil {
+			fmt.Println("Error fetching status:", err)
+			continue
+		}
+		fmt.Printf("[status] Fuel: %d, Inventory: %v\n", status.Fuel, status.Inventory)
 	}
-
-	var result model.Ids
-	if err := json.Unmarshal(body, &result); err != nil {
-		fmt.Println("Error unmarshaling JSON:", err)
-		return
-	}
-
-	if len(result.Ids) == 0 {
-		fmt.Println("No IDs found.")
-		return
-	}
-
-	fmt.Println("Current found ids:")
-	for i, id := range result.Ids {
-		fmt.Printf("ID [%d]: %s\n", i, id)
-	}
-
-	targetId := result.Ids[2]
-
-	// 2. Send the message
-	msgResp, statusCode, err := send.Message(host, targetId, model.Forward, "", "Michael")
-	if err != nil {
-		fmt.Println("Error sending message:", err)
-		return
-	}
-
-	fmt.Printf("\n[message] Status: %d\n", statusCode)
-	fmt.Printf("[message] Response: %s\n", string(msgResp))
-
-	// 3. Fetch the bot's status
-	statusResp, err := router.Get(host, "/id/"+targetId+"/status")
-	if err != nil {
-		fmt.Println("Error fetching status:", err)
-		return
-	}
-
-	fmt.Printf("\n[status] Response: %s\n", string(statusResp))
 }

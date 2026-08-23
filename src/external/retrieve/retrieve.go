@@ -30,13 +30,16 @@ func Ids(host string) ([]string, error) {
 		fmt.Println("Error making requires for ids:", err)
 		return []string{}, err
 	}
+
 	var bot model.Ids
 	if err := json.Unmarshal(body, &bot); err != nil {
 		fmt.Println("Error parsing Json request", err)
 		return []string{}, err
 	}
+
 	if len(bot.Ids) == 0 {
 		return []string{}, fmt.Errorf("no bot ids found")
 	}
+
 	return bot.Ids, nil
 }
