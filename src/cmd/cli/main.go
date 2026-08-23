@@ -35,7 +35,7 @@ func main() {
 		fmt.Printf("ID [%d]: %s\n", i, id)
 	}
 
-	targetId := result.Ids[0]
+	targetId := result.Ids[2]
 
 	// 2. Send the message
 	msgResp, statusCode, err := send.Message(host, targetId, model.Forward, "", "Michael")
