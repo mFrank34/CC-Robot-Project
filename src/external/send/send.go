@@ -10,7 +10,7 @@ import (
 
 // SendMessage builds a command message and posts it to the given bot ID.
 func Message(host, id string, cmd model.Command, arg string, from string) ([]byte, int, error) {
-	msg := model.MessageRequest{
+	msg := model.Message{
 		From:    from,
 		Payload: cmd,
 		Args:    arg,

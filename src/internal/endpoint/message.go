@@ -16,7 +16,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	var req model.MessageRequest
+	var req model.Message
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -25,7 +25,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	h.store.SetLatest(targetId, model.Message{
 		From:    req.From,
 		Payload: model.Command(req.Payload),
-		Arg:     req.Args,
+		Args:    req.Args,
 		SentAt:  time.Now(),
 	})
 

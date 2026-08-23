@@ -17,14 +17,8 @@ type Ids struct {
 type Message struct {
 	From    string    `json:"from"`
 	Payload Command   `json:"payload"`
-	Arg     string    `json:"arg,omitempty"`
+	Args    string    `json:"arg,omitempty"`
 	SentAt  time.Time `json:"timestamp"`
-}
-
-type MessageRequest struct {
-	From    string  `json:"from"`
-	Payload Command `json:"payload"`
-	Args    string  `json:"args"`
 }
 
 type InventoryItem struct {
