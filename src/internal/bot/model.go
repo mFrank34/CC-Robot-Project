@@ -10,6 +10,10 @@ type RegisterRequest struct {
 	Id string `json:"id"`
 }
 
+type Ids struct {
+	Id []string `json:"ids"`
+}
+
 type Message struct {
 	From    string    `json:"from"`
 	Payload string    `json:"payload"`

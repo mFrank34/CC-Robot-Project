@@ -35,6 +35,11 @@ func (h *Handler) Register(c *gin.Context) {
 }
 
 func (h *Handler) AllIDs(c *gin.Context) {
-	ids := h.store.GetAllIDs()
-	c.JSON(http.StatusOK, gin.H{"ids": ids})
+	rawids := h.store.GetAllIDs()
+
+	responce := bot.Ids{
+		Id: rawids,
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ids": responce})
 }
