@@ -37,11 +37,11 @@ local function httpGet(path)
         print("[http] GET " .. path .. " failed: " .. tostring(err) ..
               (code and (" (HTTP " .. code .. ")") or "") ..
               (body and body ~= "" and (" body: " .. body) or ""))
-        return nil, code
+        return nil, code, body
     end
     local body = res.readAll()
     res.close()
-    return textutils.unserializeJSON(body), res.getResponseCode()
+    return textutils.unserializeJSON(body), res.getResponseCode(), body
 end
 
 -- `bodyTable` can be a Lua table (auto-serialized) or, when rawJson is true,
@@ -64,7 +64,7 @@ local function httpPost(path, bodyTable, rawJson)
         print("[http] POST " .. path .. " failed: " .. tostring(err) ..
               (code and (" (HTTP " .. code .. ")") or "") ..
               (body and body ~= "" and (" body: " .. body) or ""))
-        return code, nil
+        return code, nil, body
     end
     local code = res.getResponseCode()
     local body = res.readAll()
@@ -73,7 +73,22 @@ local function httpPost(path, bodyTable, rawJson)
     if body and #body > 0 then
         decoded = textutils.unserializeJSON(body)
     end
-    return code, decoded
+    return code, decoded, body
+end
+
+----------------------------------------------------------------------
+-- "BOT NOT FOUND" DETECTION
+-- The server can forget a bot ID (e.g. it was restarted, or its bot list
+-- was cleared) while the turtle still has that ID cached on disk. When
+-- that happens every request 404s forever unless we notice and
+-- re-register. We check the decoded/raw error body for the server's
+-- "Bot not found" message rather than trusting a bare 404 status code,
+-- since a 404 could in principle mean something else (e.g. a bad path).
+----------------------------------------------------------------------
+
+local function isBotNotFound(code, rawBody)
+    if code ~= 404 or not rawBody then return false end
+    return rawBody:find("Bot not found", 1, true) ~= nil
 end
 
 ----------------------------------------------------------------------
@@ -99,6 +114,12 @@ local function saveId(id)
     f.close()
 end
 
+local function clearSavedId()
+    if fs.exists(ID_FILE) then
+        fs.delete(ID_FILE)
+    end
+end
+
 local function registerNewId()
     local idResp = httpGet("/id")
     if not idResp or not idResp.id then
@@ -121,6 +142,16 @@ local function getBotId()
         return id
     end
     id = registerNewId()
+    print("[init] Registered new ID: " .. id)
+    return id
+end
+
+-- Wipes the stale saved ID and registers a fresh one. Called whenever the
+-- server tells us it no longer knows about our current bot ID.
+local function reregister()
+    print("[init] Server doesn't recognize our bot ID, re-registering...")
+    clearSavedId()
+    local id = registerNewId()
     print("[init] Registered new ID: " .. id)
     return id
 end
@@ -164,6 +195,8 @@ local function inventoryToJsonArray(inventory)
     return "[" .. table.concat(parts, ",") .. "]"
 end
 
+-- Returns the HTTP status code (and, on a "bot not found" error, a second
+-- return value of true) so the caller can decide whether to re-register.
 local function reportStatus(botId)
     local fuel = turtle.getFuelLevel()
     local fuelLimit = turtle.getFuelLimit()
@@ -182,12 +215,14 @@ local function reportStatus(botId)
         fuel, fuelLimit, inventoryJson
     )
 
-    local code = httpPost("/id/" .. botId .. "/status", payload, true)
+    local code, _, rawBody = httpPost("/id/" .. botId .. "/status", payload, true)
 
     -- Surface non-2xx responses instead of failing silently.
     if code and (code < 200 or code >= 300) then
         print("[status] WARNING: server returned " .. tostring(code))
     end
+
+    return code, isBotNotFound(code, rawBody)
 end
 
 ----------------------------------------------------------------------
@@ -307,11 +342,19 @@ local function main()
     print("[init] Bot online as " .. botId)
 
     while true do
-        reportStatus(botId)
+        local _, statusNotFound = reportStatus(botId)
 
-        local resp = httpGet("/id/" .. botId .. "/message")
-        if resp and resp.message then
-            executeCommand(resp.message)
+        if statusNotFound then
+            -- No point polling for a command with an ID the server has
+            -- already forgotten; re-register now and pick up next loop.
+            botId = reregister()
+        else
+            local resp, msgCode, rawBody = httpGet("/id/" .. botId .. "/message")
+            if isBotNotFound(msgCode, rawBody) then
+                botId = reregister()
+            elseif resp and resp.message then
+                executeCommand(resp.message)
+            end
         end
 
         sleep(POLL_INTERVAL)
