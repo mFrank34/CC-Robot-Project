@@ -1,7 +1,7 @@
 package endpoint
 
 import (
-	"Robot-Project/internal/bot"
+	"Robot-Project/internal/model"
 	"net/http"
 	"time"
 
@@ -16,13 +16,13 @@ func (h *Handler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	var req bot.SendRequest
+	var req model.SendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.store.SetLatest(targetId, bot.Message{
+	h.store.SetLatest(targetId, model.Message{
 		From:    req.From,
 		Payload: req.Payload,
 		SentAt:  time.Now(),
@@ -41,7 +41,7 @@ func (h *Handler) GetMessage(c *gin.Context) {
 
 	msg, ok := h.store.GetLatest(id)
 	if !ok {
-		c.JSON(http.StatusOK, gin.H{"message": bot.Message{
+		c.JSON(http.StatusOK, gin.H{"message": model.Message{
 			Payload: "stop",
 			SentAt:  time.Now(),
 		}})

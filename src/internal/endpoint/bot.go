@@ -1,11 +1,11 @@
 package endpoint
 
-import "Robot-Project/internal/bot"
+import "Robot-Project/internal/model"
 
 type Handler struct {
-	store *bot.Store
+	store *model.Store
 }
 
-func NewHandler(store *bot.Store) *Handler {
+func NewHandler(store *model.Store) *Handler {
 	return &Handler{store: store}
 }

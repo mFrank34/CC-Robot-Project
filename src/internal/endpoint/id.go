@@ -1,7 +1,7 @@
 package endpoint
 
 import (
-	"Robot-Project/internal/bot"
+	bot "Robot-Project/internal/model"
 	"Robot-Project/internal/util"
 	"net/http"
 

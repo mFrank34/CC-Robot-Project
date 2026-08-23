@@ -74,7 +74,7 @@ func main() {
 	}
 
 	// 3. Construct the clean URL using fmt.Sprintf
-	url := fmt.Sprintf("%s/%s/message", host, result.Ids[0])
+	url := fmt.Sprintf("%s/id/%s/message", host, result.Ids[2])
 
 	// 4. Send the POST request
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(pack))

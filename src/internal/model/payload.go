@@ -1,4 +1,4 @@
-package bot
+package model
 
 import "time"
 
@@ -17,6 +17,7 @@ type Ids struct {
 type Message struct {
 	From    string    `json:"from"`
 	Payload string    `json:"payload"`
+	Arg     string    `json:"arg,omitempty"`
 	SentAt  time.Time `json:"timestamp"`
 }
 
